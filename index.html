@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>buriburi — SAP ABAP AI 개발 도구</title>
+<meta name="description" content="buriburi는 AI로 SAP ABAP 코드를 분석하고, 기존 프로그램을 안전하고 효율적으로 리팩토링하는 개발 도구를 만듭니다.">
+<meta property="og:title" content="buriburi — SAP ABAP AI 개발 도구">
+<meta property="og:description" content="AI가 ABAP 코드를 읽고, 진단하고, 리팩토링을 제안합니다.">
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f8f8f5;
+    --surface: #ffffff;
+    --surface-2: #f0f0eb;
+    --text: #15161a;
+    --muted: #5d606a;
+    --line: #e3e3dd;
+    --accent: #2357d6;
+    --accent-soft: #e6edfb;
+    --ink: #101217;         /* dark band */
+    --ink-text: #e9eaee;
+    --ink-muted: #9497a3;
+    --ink-line: #262932;
+    --del: #c2533a;
+    --add: #22895c;
+    --warn: #b7791f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111216; --surface: #181a1f; --surface-2: #1e2026; --text: #ececee;
+      --muted: #9a9ca6; --line: #2a2c33; --accent: #7ea4f5; --accent-soft: #1d2740;
+      --ink: #0b0c0f; --ink-line: #23252c; --del: #e58d74; --add: #63c799; --warn: #e2b05a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111216; --surface: #181a1f; --surface-2: #1e2026; --text: #ececee;
+    --muted: #9a9ca6; --line: #2a2c33; --accent: #7ea4f5; --accent-soft: #1d2740;
+    --ink: #0b0c0f; --ink-line: #23252c; --del: #e58d74; --add: #63c799; --warn: #e2b05a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    font-size: 17px; line-height: 1.7; word-break: keep-all;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  .mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+  /* ---------- header ---------- */
+  header {
+    position: sticky; top: 0; z-index: 20;
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    backdrop-filter: saturate(1.4) blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  header .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; letter-spacing: -0.03em; text-decoration: none; }
+  .logo-mark {
+    width: 28px; height: 28px; border-radius: 8px; background: var(--accent);
+    display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 800; letter-spacing: -0.04em;
+  }
+  nav { display: flex; align-items: center; gap: 32px; font-size: 15px; }
+  nav a { text-decoration: none; color: var(--muted); transition: color .15s; }
+  nav a:hover { color: var(--text); }
+  nav a.nav-cta {
+    color: var(--bg); background: var(--text); padding: 8px 16px; border-radius: 8px; font-weight: 600;
+  }
+  nav a.nav-cta:hover { color: var(--bg); opacity: .88; }
+
+  /* ---------- hero ---------- */
+  .hero { position: relative; overflow: hidden; padding: 112px 0 0; }
+  .hero::before {
+    content: ""; position: absolute; inset: 0;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 30%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 30%, transparent 75%);
+    opacity: .7; pointer-events: none;
+  }
+  .hero::after {
+    content: ""; position: absolute; left: 50%; top: -240px; width: 900px; height: 600px; transform: translateX(-50%);
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 18%, transparent), transparent);
+    pointer-events: none;
+  }
+  .hero .wrap { position: relative; z-index: 1; text-align: center; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 13.5px; font-weight: 600; color: var(--accent);
+    background: var(--accent-soft); padding: 6px 14px; border-radius: 999px;
+  }
+  .badge i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  .hero h1 {
+    margin: 28px auto 0; max-width: 14em;
+    font-size: clamp(36px, 6.4vw, 66px); line-height: 1.2; letter-spacing: -0.035em; font-weight: 800;
+  }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero .lead {
+    margin: 26px auto 0; max-width: 34em;
+    font-size: clamp(17px, 2.1vw, 20px); color: var(--muted);
+  }
+  .cta { margin-top: 40px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 14px 24px; border-radius: 10px; font-size: 15.5px; font-weight: 600; text-decoration: none;
+    border: 1px solid var(--line); background: var(--surface); transition: transform .15s, box-shadow .15s;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,.06); }
+  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* product mock */
+  .mock {
+    margin: 72px auto 0; max-width: 1000px; text-align: left;
+    background: var(--surface); border: 1px solid var(--line); border-bottom: none;
+    border-radius: 16px 16px 0 0; overflow: hidden;
+    box-shadow: 0 30px 80px -20px rgba(20, 30, 60, .18);
+  }
+  .mock-bar {
+    display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+    border-bottom: 1px solid var(--line); background: var(--surface-2); font-size: 13px; color: var(--muted);
+  }
+  .dots { display: flex; gap: 6px; margin-right: 8px; }
+  .dots span { width: 11px; height: 11px; border-radius: 50%; background: var(--line); }
+  .mock-tab { padding: 3px 10px; border-radius: 6px; background: var(--surface); border: 1px solid var(--line); color: var(--text); }
+  .mock-body { display: grid; grid-template-columns: 1.15fr 1fr; min-height: 340px; }
+  .mock-code { padding: 20px 0; border-right: 1px solid var(--line); font-size: 13px; line-height: 1.9; overflow-x: auto; }
+  .ln { display: block; white-space: pre; padding-right: 16px; }
+  .ln b { display: inline-block; width: 44px; text-align: right; padding-right: 16px; color: var(--muted); opacity: .55; font-weight: 400; }
+  .ln.hl { background: color-mix(in srgb, var(--warn) 12%, transparent); box-shadow: inset 3px 0 0 var(--warn); }
+  .kw { color: var(--accent); font-weight: 600; }
+  .cm { color: var(--muted); font-style: italic; }
+  .mock-ai { padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; }
+  .ai-head { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 700; }
+  .ai-head .spark { width: 22px; height: 22px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; }
+  .finding { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 13.5px; line-height: 1.55; }
+  .finding .tag { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-bottom: 6px; }
+  .tag.perf { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+  .tag.struct { color: var(--accent); background: var(--accent-soft); }
+  .tag.ok { color: var(--add); background: color-mix(in srgb, var(--add) 14%, transparent); }
+  .finding p { color: var(--muted); }
+  .finding p strong { color: var(--text); font-weight: 600; }
+  .ai-actions { display: flex; gap: 8px; margin-top: auto; }
+  .ai-actions span { font-size: 12.5px; font-weight: 600; padding: 7px 12px; border-radius: 7px; border: 1px solid var(--line); }
+  .ai-actions span.go { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+  /* scope strip */
+  .scope { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--surface); }
+  .scope .wrap { display: flex; align-items: center; gap: 28px; padding-top: 26px; padding-bottom: 26px; flex-wrap: wrap; }
+  .scope p { font-size: 14px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips span { font-size: 13.5px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); }
+
+  /* ---------- sections ---------- */
+  section.block { padding: 120px 0; }
+  .sec-head { max-width: 680px; }
+  .sec-head.center { margin: 0 auto; text-align: center; }
+  .kicker { font-size: 14px; font-weight: 700; color: var(--accent); letter-spacing: .02em; margin-bottom: 16px; }
+  h2 { font-size: clamp(28px, 4.2vw, 42px); line-height: 1.3; letter-spacing: -0.03em; font-weight: 800; }
+  .sec-head p { margin-top: 20px; color: var(--muted); font-size: 18px; }
+
+  /* problem cards */
+  .pains { margin-top: 64px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .pain { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 32px 28px; }
+  .pain .num { font-size: 13px; font-weight: 700; color: var(--muted); }
+  .pain h3 { margin-top: 18px; font-size: 20px; letter-spacing: -0.02em; line-height: 1.4; }
+  .pain p { margin-top: 10px; color: var(--muted); font-size: 15.5px; }
+
+  /* product features */
+  .features { margin-top: 64px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .feature {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 36px 30px;
+    transition: border-color .2s, transform .2s;
+  }
+  .feature:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); transform: translateY(-2px); }
+  .icon { width: 48px; height: 48px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; }
+  .icon svg { width: 24px; height: 24px; }
+  .feature h3 { margin-top: 24px; font-size: 22px; letter-spacing: -0.02em; }
+  .feature > p { margin-top: 10px; color: var(--muted); font-size: 15.5px; }
+  .feature ul { margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--line); list-style: none; display: grid; gap: 10px; font-size: 15px; }
+  .feature li { display: flex; gap: 10px; align-items: flex-start; }
+  .feature li::before {
+    content: ""; flex: none; width: 16px; height: 16px; margin-top: 4px; border-radius: 50%;
+    background: var(--accent-soft) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 8.2l2.2 2.2 4.8-4.8' fill='none' stroke='%232357d6' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/16px no-repeat;
+  }
+
+  /* ---------- dark band: before/after ---------- */
+  .band { background: var(--ink); color: var(--ink-text); }
+  .band .kicker { color: #8fb0ff; }
+  .band .sec-head p { color: var(--ink-muted); }
+  .diff { margin-top: 56px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .diff figure { border: 1px solid var(--ink-line); border-radius: 14px; overflow: hidden; background: #15171d; }
+  .diff figcaption {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 18px; border-bottom: 1px solid var(--ink-line); font-size: 13px; color: var(--ink-muted);
+  }
+  .diff figcaption b { font-weight: 700; }
+  .diff .before figcaption b { color: #f0937a; }
+  .diff .after figcaption b { color: #6fd1a3; }
+  .diff pre { padding: 20px 18px; font-size: 13.5px; line-height: 1.8; overflow-x: auto; color: #d8dae0; }
+  .diff .kw { color: #8fb0ff; }
+  .diff .cm { color: #7c808c; }
+  .diff-notes { margin-top: 28px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .diff-notes div { border-top: 1px solid var(--ink-line); padding-top: 18px; font-size: 15px; color: var(--ink-muted); }
+  .diff-notes strong { display: block; color: var(--ink-text); font-size: 16px; margin-bottom: 4px; }
+
+  /* ---------- process ---------- */
+  .steps { margin-top: 64px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; position: relative; }
+  .step { position: relative; padding-top: 64px; }
+  .step .dot {
+    position: absolute; top: 0; left: 0; width: 44px; height: 44px; border-radius: 50%;
+    background: var(--surface); border: 1.5px solid var(--accent); color: var(--accent);
+    display: grid; place-items: center; font-weight: 800; font-size: 15px; z-index: 1;
+  }
+  .step::before {
+    content: ""; position: absolute; top: 22px; left: 44px; right: -20px; height: 1.5px;
+    background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 12px);
+  }
+  .step:last-child::before { display: none; }
+  .step h3 { font-size: 20px; letter-spacing: -0.02em; }
+  .step p { margin-top: 8px; color: var(--muted); font-size: 15.5px; }
+
+  .principle {
+    margin-top: 80px; display: grid; grid-template-columns: 1fr 1.3fr; gap: 48px; align-items: center;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 48px;
+  }
+  .principle h3 { font-size: clamp(22px, 3vw, 30px); letter-spacing: -0.03em; line-height: 1.35; }
+  .principle h3 em { font-style: normal; color: var(--accent); }
+  .principle ul { list-style: none; display: grid; gap: 18px; }
+  .principle li { display: grid; grid-template-columns: 28px 1fr; gap: 12px; color: var(--muted); font-size: 15.5px; }
+  .principle li strong { display: block; color: var(--text); font-size: 16.5px; margin-bottom: 2px; }
+  .principle li svg { width: 22px; height: 22px; color: var(--accent); margin-top: 3px; }
+
+  /* ---------- about ---------- */
+  .about { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: start; }
+  .about .prose p { color: var(--muted); font-size: 17px; }
+  .about .prose p + p { margin-top: 18px; }
+  .about .prose strong { color: var(--text); }
+  .facts { display: grid; gap: 0; border-top: 1px solid var(--line); }
+  .facts div { display: grid; grid-template-columns: 120px 1fr; gap: 16px; padding: 18px 0; border-bottom: 1px solid var(--line); font-size: 15.5px; }
+  .facts dt { color: var(--muted); }
+  .facts dd { font-weight: 600; }
+
+  /* ---------- contact ---------- */
+  .contact-card {
+    position: relative; overflow: hidden; border-radius: 24px; padding: 80px 48px; text-align: center;
+    background: var(--ink); color: var(--ink-text);
+  }
+  .contact-card::before {
+    content: ""; position: absolute; inset: 0;
+    background:
+      radial-gradient(600px 300px at 15% 0%, rgba(80,130,255,.28), transparent 70%),
+      radial-gradient(500px 300px at 90% 100%, rgba(80,130,255,.18), transparent 70%);
+  }
+  .contact-card > * { position: relative; }
+  .contact-card h2 { max-width: 18em; margin: 0 auto; }
+  .contact-card p { margin-top: 18px; color: var(--ink-muted); font-size: 18px; }
+  .mail {
+    display: inline-flex; align-items: center; gap: 10px; margin-top: 36px;
+    padding: 16px 28px; border-radius: 12px; background: #fff; color: #15161a;
+    font-weight: 700; font-size: 17px; text-decoration: none; transition: transform .15s;
+  }
+  .mail:hover { transform: translateY(-2px); }
+  .mail svg { width: 20px; height: 20px; }
+
+  /* ---------- footer ---------- */
+  footer { padding: 64px 0 48px; border-top: 1px solid var(--line); margin-top: 120px; }
+  .foot { display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: 40px; }
+  .foot p { margin-top: 14px; color: var(--muted); font-size: 14.5px; max-width: 24em; }
+  .foot h4 { font-size: 13.5px; color: var(--muted); font-weight: 600; margin-bottom: 14px; }
+  .foot ul { list-style: none; display: grid; gap: 8px; font-size: 14.5px; }
+  .foot ul a { text-decoration: none; }
+  .foot ul a:hover { color: var(--accent); }
+  .copy { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 13.5px; color: var(--muted); }
+
+  /* ---------- reveal ---------- */
+  .reveal { opacity: 0; transform: translateY(16px); transition: opacity .7s ease, transform .7s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 920px) {
+    .pains, .features { grid-template-columns: 1fr; }
+    .mock-body { grid-template-columns: 1fr; }
+    .mock-code { border-right: none; border-bottom: 1px solid var(--line); }
+    .diff, .diff-notes { grid-template-columns: 1fr; }
+    .steps { grid-template-columns: 1fr 1fr; row-gap: 48px; }
+    .step::before { display: none; }
+    .principle, .about { grid-template-columns: 1fr; gap: 32px; }
+    .foot { grid-template-columns: 1fr 1fr; }
+    .foot > div:first-child { grid-column: 1 / -1; }
+  }
+  @media (max-width: 640px) {
+    nav a:not(.nav-cta) { display: none; }
+    .hero { padding-top: 72px; }
+    .mock { margin-top: 56px; }
+    .mock-code { font-size: 12px; }
+    section.block { padding: 80px 0; }
+    .steps { grid-template-columns: 1fr; }
+    .principle { padding: 32px 24px; }
+    .contact-card { padding: 56px 24px; border-radius: 18px; }
+    .facts div { grid-template-columns: 96px 1fr; }
+    footer { margin-top: 80px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="logo" href="#top"><span class="logo-mark">bb</span>buriburi</a>
+    <nav>
+      <a href="#problem">문제</a>
+      <a href="#product">제품</a>
+      <a href="#approach">접근 방식</a>
+      <a href="#about">회사 소개</a>
+      <a href="#contact" class="nav-cta">도입 문의</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <!-- HERO -->
+  <section class="hero">
+    <div class="wrap">
+      <span class="badge"><i></i>AI for SAP ABAP</span>
+      <h1>오래된 ABAP 코드를<br><em>AI가 읽고, 정리합니다.</em></h1>
+      <p class="lead">buriburi는 AI로 SAP ABAP 프로그램을 분석하고, 기존 코드를 안전하고 효율적으로 리팩토링하는 개발 도구를 만듭니다.</p>
+      <div class="cta">
+        <a class="btn primary" href="#contact">도입 문의하기 →</a>
+        <a class="btn" href="#product">제품 살펴보기</a>
+      </div>
+
+      <div class="mock" aria-label="buriburi 분석 화면 예시">
+        <div class="mock-bar">
+          <div class="dots"><span></span><span></span><span></span></div>
+          <span class="mock-tab mono">ZSDR0120_F01</span>
+          <span class="mono">FORM get_data</span>
+        </div>
+        <div class="mock-body">
+          <div class="mock-code mono">
+            <div class="ln"><b>41</b><span class="kw">FORM</span> get_data.</div>
+            <div class="ln"><b>42</b>  <span class="kw">SELECT</span> * <span class="kw">FROM</span> vbak <span class="kw">INTO TABLE</span> gt_vbak</div>
+            <div class="ln"><b>43</b>    <span class="kw">WHERE</span> erdat <span class="kw">IN</span> s_erdat.</div>
+            <div class="ln"><b>44</b></div>
+            <div class="ln hl"><b>45</b>  <span class="kw">LOOP AT</span> gt_vbak <span class="kw">INTO</span> gs_vbak.</div>
+            <div class="ln hl"><b>46</b>    <span class="kw">SELECT SINGLE</span> name1 <span class="kw">FROM</span> kna1</div>
+            <div class="ln hl"><b>47</b>      <span class="kw">INTO</span> gs_vbak-name1</div>
+            <div class="ln hl"><b>48</b>      <span class="kw">WHERE</span> kunnr = gs_vbak-kunnr.</div>
+            <div class="ln"><b>49</b>    <span class="kw">MODIFY</span> gt_vbak <span class="kw">FROM</span> gs_vbak.</div>
+            <div class="ln"><b>50</b>  <span class="kw">ENDLOOP</span>.</div>
+            <div class="ln"><b>51</b><span class="kw">ENDFORM</span>.</div>
+          </div>
+          <div class="mock-ai">
+            <div class="ai-head"><span class="spark">✦</span>AI 분석 결과</div>
+            <div class="finding">
+              <span class="tag perf">성능</span>
+              <p><strong>45–48행</strong> · LOOP 안에서 SELECT SINGLE을 반복 호출합니다. 조회 건수만큼 DB 접근이 발생합니다.</p>
+            </div>
+            <div class="finding">
+              <span class="tag struct">구조</span>
+              <p><strong>42행</strong> · SELECT * 대신 실제 사용하는 필드만 조회하도록 제안합니다.</p>
+            </div>
+            <div class="finding">
+              <span class="tag ok">영향 범위</span>
+              <p>이 FORM을 호출하는 곳 <strong>2곳</strong> · 출력 결과는 변경 전과 동일합니다.</p>
+            </div>
+            <div class="ai-actions"><span class="go">변경안 보기</span><span>무시</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="scope">
+    <div class="wrap">
+      <p>분석 대상</p>
+      <div class="chips">
+        <span>Report</span><span>Include</span><span>Function Module</span><span>RFC</span>
+        <span>Class / Method</span><span>Module Pool</span><span>ALV</span><span>Enhancement</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROBLEM -->
+  <section class="block" id="problem">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="kicker">우리가 푸는 문제</p>
+        <h2>SAP는 오래 쓸수록,<br>코드를 아는 사람이 줄어듭니다.</h2>
+        <p>buriburi는 ABAP 현장 개발자의 관점에서, 매일 마주치는 이 문제들을 풉니다.</p>
+      </div>
+      <div class="pains">
+        <div class="pain reveal">
+          <span class="num mono">01</span>
+          <h3>문서 없이 쌓인 Z 프로그램</h3>
+          <p>수년간 덧붙여진 INCLUDE와 FORM. 무엇을 하는 프로그램인지 코드를 처음부터 따라 읽어야 합니다.</p>
+        </div>
+        <div class="pain reveal">
+          <span class="num mono">02</span>
+          <h3>작은 수정, 큰 영향 범위</h3>
+          <p>한 줄을 고치기 위해 호출 관계와 테이블 사용처를 일일이 찾아보느라 며칠이 걸립니다.</p>
+        </div>
+        <div class="pain reveal">
+          <span class="num mono">03</span>
+          <h3>알면서도 못 고치는 성능 문제</h3>
+          <p>느린 걸 알지만 운영 중인 코드라 손대기 부담스럽고, 개선 효과를 설명하기도 어렵습니다.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRODUCT -->
+  <section class="block" id="product" style="padding-top:0">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="kicker">제품</p>
+        <h2>분석부터 리팩토링까지,<br>ABAP 개발 흐름 그대로.</h2>
+      </div>
+      <div class="features">
+        <div class="feature reveal">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/><path d="M8.5 11h5M11 8.5v5"/></svg></div>
+          <h3>코드 분석</h3>
+          <p>프로그램 전체를 읽고 구조와 흐름을 한눈에 정리합니다.</p>
+          <ul>
+            <li>INCLUDE · FORM · 메서드 호출 관계 시각화</li>
+            <li>테이블 접근과 데이터 흐름 추적</li>
+            <li>문서 없는 프로그램의 기능 요약</li>
+          </ul>
+        </div>
+        <div class="feature reveal">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h11M4 12h7M4 17h11"/><path d="M17 10l3 3-3 3"/></svg></div>
+          <h3>리팩토링</h3>
+          <p>동작은 그대로 두고, 읽기 쉽고 빠른 코드로 바꿉니다.</p>
+          <ul>
+            <li>LOOP 안 SELECT 등 성능 병목 개선</li>
+            <li>신규 ABAP 문법과 내부 테이블 처리 최적화</li>
+            <li>FORM 서브루틴의 클래스 · 메서드 구조화</li>
+          </ul>
+        </div>
+        <div class="feature reveal">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg></div>
+          <h3>품질 점검</h3>
+          <p>팀의 기준에 맞춰 코드를 일관되게 관리합니다.</p>
+          <ul>
+            <li>명명 규칙과 Clean ABAP 기준 점검</li>
+            <li>S/4HANA 전환 시 호환성 이슈 탐지</li>
+            <li>변경 전후 비교로 빠른 코드 리뷰</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BEFORE / AFTER -->
+  <section class="block band">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="kicker">리팩토링 예시</p>
+        <h2>같은 결과, 더 적은 DB 접근.</h2>
+        <p>buriburi는 바꾼 코드만 내놓지 않습니다. 왜 바꿨는지, 무엇이 달라지는지 함께 보여 줍니다.</p>
+      </div>
+      <div class="diff reveal">
+        <figure class="before">
+          <figcaption><b>Before</b><span>조회 건수만큼 SELECT 반복</span></figcaption>
+<pre class="mono"><span class="kw">LOOP AT</span> gt_vbak <span class="kw">INTO</span> gs_vbak.
+  <span class="kw">SELECT SINGLE</span> name1
+    <span class="kw">FROM</span> kna1
+    <span class="kw">INTO</span> gs_vbak-name1
+    <span class="kw">WHERE</span> kunnr = gs_vbak-kunnr.
+  <span class="kw">MODIFY</span> gt_vbak <span class="kw">FROM</span> gs_vbak.
+<span class="kw">ENDLOOP</span>.</pre>
+        </figure>
+        <figure class="after">
+          <figcaption><b>After</b><span>한 번에 조회 후 매핑</span></figcaption>
+<pre class="mono"><span class="kw">SELECT</span> kunnr, name1
+  <span class="kw">FROM</span> kna1
+  <span class="kw">FOR ALL ENTRIES IN</span> @gt_vbak
+  <span class="kw">WHERE</span> kunnr = @gt_vbak-kunnr
+  <span class="kw">INTO TABLE</span> @<span class="kw">DATA</span>(lt_kna1).
+
+<span class="kw">LOOP AT</span> gt_vbak <span class="kw">ASSIGNING FIELD-SYMBOL</span>(&lt;ls&gt;).
+  &lt;ls&gt;-name1 = <span class="kw">VALUE</span> #( lt_kna1[ kunnr = &lt;ls&gt;-kunnr ]-name1
+                         <span class="kw">OPTIONAL</span> ).
+<span class="kw">ENDLOOP</span>.</pre>
+        </figure>
+      </div>
+      <div class="diff-notes reveal">
+        <div><strong>무엇이 바뀌나</strong>반복 SELECT SINGLE을 FOR ALL ENTRIES 한 번으로 묶었습니다.</div>
+        <div><strong>왜 바꾸나</strong>데이터가 많을수록 DB 왕복 횟수가 실행 시간을 좌우합니다.</div>
+        <div><strong>무엇이 그대로인가</strong>gt_vbak에 채워지는 결과는 변경 전과 같습니다.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- APPROACH -->
+  <section class="block" id="approach">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="kicker">접근 방식</p>
+        <h2>AI는 제안하고,<br>결정은 개발자가 합니다.</h2>
+      </div>
+      <div class="steps">
+        <div class="step reveal"><span class="dot">1</span><h3>읽기</h3><p>프로그램과 관련 오브젝트를 함께 읽어 전체 맥락을 파악합니다.</p></div>
+        <div class="step reveal"><span class="dot">2</span><h3>진단</h3><p>성능, 구조, 규칙 위반 등 개선이 필요한 지점을 찾습니다.</p></div>
+        <div class="step reveal"><span class="dot">3</span><h3>제안</h3><p>바꿀 코드와 그 근거를 변경 전후 비교로 보여 줍니다.</p></div>
+        <div class="step reveal"><span class="dot">4</span><h3>검토 · 반영</h3><p>개발자가 확인하고 승인한 변경만 반영합니다.</p></div>
+      </div>
+
+      <div class="principle reveal">
+        <h3>운영 중인 코드는<br><em>신중하게</em> 다뤄야 합니다.</h3>
+        <ul>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>
+            <div><strong>근거가 있는 제안</strong>모든 변경안에 이유와 영향 범위를 함께 제시합니다.</div>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>
+            <div><strong>개발자 승인 후 반영</strong>자동으로 덮어쓰지 않고, 사람이 확인한 변경만 적용합니다.</div>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>
+            <div><strong>팀의 규칙을 따르는 코드</strong>회사마다 다른 명명 규칙과 코딩 스타일에 맞춥니다.</div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ABOUT -->
+  <section class="block" id="about" style="padding-top:0">
+    <div class="wrap about">
+      <div class="sec-head reveal">
+        <p class="kicker">회사 소개</p>
+        <h2>ABAP 현장의 개발자가<br>직접 만듭니다.</h2>
+      </div>
+      <div class="reveal">
+        <div class="prose">
+          <p>buriburi는 SAP 현장에서 ABAP 개발을 해 온 개발자가 시작했습니다. 남이 짠 코드를 해석하고, 영향 범위를 찾고, 조심스럽게 고치는 일이 얼마나 많은 시간을 쓰는지 직접 겪어 왔습니다.</p>
+          <p>그래서 우리는 <strong>ABAP 개발자가 실제로 일하는 방식</strong>에 맞춘 AI 도구를 만듭니다. 화려한 자동화보다, 매일 쓰는 개발 흐름 안에서 확실하게 시간을 줄여 주는 도구가 목표입니다.</p>
+        </div>
+        <dl class="facts" style="margin-top:36px">
+          <div><dt>회사명</dt><dd>buriburi</dd></div>
+          <div><dt>분야</dt><dd>SAP ABAP AI 개발 도구</dd></div>
+          <div><dt>웹사이트</dt><dd>buriburi.net</dd></div>
+          <div><dt>문의</dt><dd><a href="mailto:yussi12@buriburi.net">yussi12@buriburi.net</a></dd></div>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONTACT -->
+  <section id="contact">
+    <div class="wrap">
+      <div class="contact-card reveal">
+        <h2>ABAP 코드 때문에 고민이 있다면,<br>이야기해 주세요.</h2>
+        <p>도입 상담, 파일럿 적용, 협업 제안 모두 환영합니다.</p>
+        <a class="mail" href="mailto:yussi12@buriburi.net">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5L12 13l8.5-6.5"/></svg>
+          yussi12@buriburi.net
+        </a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <a class="logo" href="#top"><span class="logo-mark">bb</span>buriburi</a>
+        <p>AI로 SAP ABAP 코드를 분석하고, 안전하게 리팩토링하는 개발 도구를 만듭니다.</p>
+      </div>
+      <div>
+        <h4>바로가기</h4>
+        <ul>
+          <li><a href="#problem">문제</a></li>
+          <li><a href="#product">제품</a></li>
+          <li><a href="#approach">접근 방식</a></li>
+          <li><a href="#about">회사 소개</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>문의</h4>
+        <ul>
+          <li><a href="mailto:yussi12@buriburi.net">yussi12@buriburi.net</a></li>
+          <li><a href="https://buriburi.net">buriburi.net</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="copy">
+      <span>© 2026 buriburi. All rights reserved.</span>
+      <span>SAP 및 ABAP은 SAP SE의 상표입니다.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var els = document.querySelectorAll('.reveal');
+    if (!('IntersectionObserver' in window)) { els.forEach(function (e) { e.classList.add('in'); }); return; }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+    els.forEach(function (e) { io.observe(e); });
+  })();
+</script>
+</body>
+</html>
